@@ -18,6 +18,11 @@ export default {
 			}
 		},
 		extend: {
+			fontFamily: {
+				display: ['"Cormorant Garamond"', 'serif'],
+				body: ['"Golos Text"', 'sans-serif'],
+				rune: ['MedievalSharp', 'serif'],
+			},
 			colors: {
 				border: 'hsl(var(--border))',
 				input: 'hsl(var(--input))',
