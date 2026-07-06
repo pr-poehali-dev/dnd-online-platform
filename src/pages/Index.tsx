@@ -12,14 +12,59 @@ const MAP_IMG =
 const AVATAR_IMG =
   'https://cdn.poehali.dev/projects/967f7ffd-40c6-4f5a-91c5-5266de35741c/files/31d6a2ef-3f02-4589-b883-c62ad3dad838.jpg';
 
+type DieShape = 'triangle' | 'square' | 'diamond' | 'kite' | 'pentagon' | 'hexagon';
+
 const DICE = [
-  { name: 'd4', sides: 4, icon: 'Triangle' },
-  { name: 'd6', sides: 6, icon: 'Dice6' },
-  { name: 'd8', sides: 8, icon: 'Diamond' },
-  { name: 'd10', sides: 10, icon: 'Pentagon' },
-  { name: 'd12', sides: 12, icon: 'Hexagon' },
-  { name: 'd20', sides: 20, icon: 'Sparkles' },
+  { name: 'd4', sides: 4, shape: 'triangle' as DieShape },
+  { name: 'd6', sides: 6, shape: 'square' as DieShape },
+  { name: 'd8', sides: 8, shape: 'diamond' as DieShape },
+  { name: 'd10', sides: 10, shape: 'kite' as DieShape },
+  { name: 'd12', sides: 12, shape: 'pentagon' as DieShape },
+  { name: 'd20', sides: 20, shape: 'hexagon' as DieShape },
 ] as const;
+
+const SHAPE_CLIP: Record<DieShape, string> = {
+  triangle: 'polygon(50% 4%, 96% 94%, 4% 94%)',
+  square: 'polygon(8% 8%, 92% 8%, 92% 92%, 8% 92%)',
+  diamond: 'polygon(50% 2%, 98% 50%, 50% 98%, 2% 50%)',
+  kite: 'polygon(50% 0%, 90% 38%, 50% 100%, 10% 38%)',
+  pentagon: 'polygon(50% 2%, 98% 40%, 79% 98%, 21% 98%, 2% 40%)',
+  hexagon: 'polygon(50% 2%, 95% 26%, 95% 74%, 50% 98%, 5% 26%, 5% 74%)',
+};
+
+function DiceShape({
+  shape,
+  children,
+  className = '',
+  style,
+}: {
+  shape: DieShape;
+  children?: React.ReactNode;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <div
+      className={`relative flex items-center justify-center ${className}`}
+      style={{
+        clipPath: SHAPE_CLIP[shape],
+        background: 'linear-gradient(150deg, #f4d488 0%, #d99a3a 55%, #8a5518 100%)',
+        ...style,
+      }}
+    >
+      <span
+        className="absolute inset-[2px]"
+        style={{
+          clipPath: SHAPE_CLIP[shape],
+          background: 'linear-gradient(150deg, #3a2a14, #1c130a)',
+        }}
+      />
+      <span className="relative z-10 flex items-center justify-center w-full h-full">
+        {children}
+      </span>
+    </div>
+  );
+}
 
 export default function Index() {
   const [screen, setScreen] = useState<Screen>('landing');
@@ -389,7 +434,7 @@ function RoomManager() {
 
 /* ---------- BATTLE MAP ---------- */
 function BattleMap() {
-  const [rolling, setRolling] = useState<null | { name: string; value: number }>(null);
+  const [rolling, setRolling] = useState<null | { name: string; value: number; shape: DieShape }>(null);
   const [tokens, setTokens] = useState([
     { id: 1, x: 25, y: 35, type: 'player', label: 'Лираэль', hp: 86, color: '#4ade80' },
     { id: 2, x: 55, y: 55, type: 'enemy', label: 'Гоблин', hp: 40, color: '#ef4444' },
@@ -397,9 +442,9 @@ function BattleMap() {
     { id: 4, x: 42, y: 70, type: 'prop', label: 'Сундук', hp: 100, color: '#d99a3a' },
   ]);
 
-  const roll = (name: string, sides: number) => {
+  const roll = (name: string, sides: number, shape: DieShape) => {
     const value = Math.floor(Math.random() * sides) + 1;
-    setRolling({ name, value });
+    setRolling({ name, value, shape });
     setTimeout(() => setRolling(null), 2200);
   };
 
@@ -437,10 +482,10 @@ function BattleMap() {
             {rolling && (
               <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                 <div className="animate-dice flex flex-col items-center">
-                  <div className="w-24 h-24 rounded-2xl gold-border flex items-center justify-center glow-gold bg-card/90 backdrop-blur">
+                  <DiceShape shape={rolling.shape} className="w-28 h-28 glow-gold">
                     <span className="font-rune text-5xl gold-text">{rolling.value}</span>
-                  </div>
-                  <span className="mt-2 text-primary font-display text-lg">
+                  </DiceShape>
+                  <span className="mt-3 text-primary font-display text-lg">
                     {rolling.name}: выпало {rolling.value}
                   </span>
                 </div>
@@ -461,11 +506,13 @@ function BattleMap() {
             {DICE.map((d) => (
               <button
                 key={d.name}
-                onClick={() => roll(d.name, d.sides)}
-                className="flex flex-col items-center gap-1 px-4 py-3 rounded-lg bg-secondary/60 border border-border hover:border-primary hover:glow-gold transition hover-scale"
+                onClick={() => roll(d.name, d.sides, d.shape)}
+                className="flex flex-col items-center gap-2 px-4 py-3 rounded-lg bg-secondary/60 border border-border hover:border-primary hover:glow-gold transition hover-scale"
               >
-                <Icon name={d.icon} size={22} className="text-primary" />
-                <span className="text-sm font-medium">{d.name}</span>
+                <DiceShape shape={d.shape} className="w-11 h-11">
+                  <span className="font-rune text-sm gold-text">{d.name}</span>
+                </DiceShape>
+                <span className="text-xs font-medium text-muted-foreground">{d.name}</span>
               </button>
             ))}
           </div>
