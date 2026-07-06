@@ -1,16 +1,22 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Icon from '@/components/ui/icon';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Divider, Panel } from '@/components/dnd/Ornament';
+import CharacterSheet from '@/components/dnd/CharacterSheet';
+import RoomModal from '@/components/dnd/RoomModal';
+import { toast } from '@/hooks/use-toast';
+import {
+  Character,
+  AVATAR_POOL,
+  MAP_POOL,
+  randomStats,
+} from '@/components/dnd/types';
 
 type Screen = 'landing' | 'auth' | 'mode' | 'master' | 'player';
 
-const MAP_IMG =
-  'https://cdn.poehali.dev/projects/967f7ffd-40c6-4f5a-91c5-5266de35741c/files/46718763-04bb-494a-925d-12cc6fcbeed6.jpg';
-const AVATAR_IMG =
-  'https://cdn.poehali.dev/projects/967f7ffd-40c6-4f5a-91c5-5266de35741c/files/31d6a2ef-3f02-4589-b883-c62ad3dad838.jpg';
+const AVATAR_IMG = AVATAR_POOL[0];
 
 type DieShape = 'triangle' | 'square' | 'diamond' | 'kite' | 'pentagon' | 'hexagon';
 
@@ -368,32 +374,52 @@ function CampaignBook() {
 }
 
 function RoomManager() {
-  const players = [
-    { name: 'Лираэль', race: 'Эльф', cls: 'Следопыт', hp: 24, max: 28, lvl: 4 },
-    { name: 'Торин', race: 'Дворф', cls: 'Воин', hp: 38, max: 38, lvl: 5 },
-    { name: 'Зара', race: 'Тифлинг', cls: 'Чародей', hp: 16, max: 22, lvl: 4 },
-  ];
+  const [roomOpen, setRoomOpen] = useState(false);
+  const [room, setRoom] = useState<{ title: string; code: string } | null>(null);
+  const [selected, setSelected] = useState<Character | null>(null);
+  const [sheetOpen, setSheetOpen] = useState(false);
+
+  const [players, setPlayers] = useState<Character[]>([
+    { id: 1, name: 'Лираэль', race: 'Эльф', cls: 'Следопыт', hp: 24, maxHp: 28, lvl: 4, avatar: AVATAR_POOL[0], backstory: 'Хранительница леса Тень-Шёпот, ищущая пропавшего брата.', stats: randomStats() },
+    { id: 2, name: 'Торин', race: 'Дворф', cls: 'Воин', hp: 38, maxHp: 38, lvl: 5, avatar: AVATAR_POOL[1], backstory: 'Бывший страж горного клана, изгнанный за отказ поднять оружие на невиновных.', stats: randomStats() },
+    { id: 3, name: 'Зара', race: 'Тифлинг', cls: 'Чародей', hp: 16, maxHp: 22, lvl: 4, avatar: AVATAR_POOL[2], backstory: 'Дитя запретного пакта, скрывающееся от охотников на ведьм.', stats: randomStats() },
+  ]);
+
   return (
     <div className="grid lg:grid-cols-3 gap-5">
       <Panel className="lg:col-span-1">
         <h3 className="font-display text-2xl mb-4 flex items-center gap-2">
-          <Icon name="Castle" size={20} className="text-primary" /> Создать комнату
+          <Icon name="Castle" size={20} className="text-primary" /> Комната
         </h3>
-        <div className="space-y-3">
-          <Field icon="Type" placeholder="Название стола" />
-          <Field icon="KeyRound" placeholder="Пароль для входа" />
-          <Button className="w-full gap-2 glow-gold">
+        {room ? (
+          <div className="space-y-3">
+            <div className="bg-secondary/50 rounded-lg p-3">
+              <p className="text-muted-foreground text-xs mb-1">Активный стол</p>
+              <p className="font-display text-xl">{room.title}</p>
+            </div>
+            <div className="bg-secondary/50 rounded-lg p-3 text-sm">
+              <p className="text-muted-foreground text-xs mb-1">Код приглашения</p>
+              <div className="flex items-center justify-between">
+                <span className="font-rune text-primary text-lg tracking-widest">{room.code}</span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard?.writeText(room.code);
+                    toast({ title: 'Код скопирован' });
+                  }}
+                >
+                  <Icon name="Copy" size={15} className="text-muted-foreground cursor-pointer hover:text-primary" />
+                </button>
+              </div>
+            </div>
+            <Button variant="outline" className="w-full gap-2" onClick={() => setRoom(null)}>
+              <Icon name="X" size={15} /> Закрыть стол
+            </Button>
+          </div>
+        ) : (
+          <Button className="w-full gap-2 glow-gold" onClick={() => setRoomOpen(true)}>
             <Icon name="Plus" size={16} /> Открыть стол
           </Button>
-        </div>
-        <Divider className="!my-5" />
-        <div className="bg-secondary/50 rounded-lg p-3 text-sm">
-          <p className="text-muted-foreground text-xs mb-1">Код приглашения</p>
-          <div className="flex items-center justify-between">
-            <span className="font-rune text-primary text-lg tracking-widest">NVR-7X2</span>
-            <Icon name="Copy" size={15} className="text-muted-foreground cursor-pointer" />
-          </div>
-        </div>
+        )}
       </Panel>
       <Panel className="lg:col-span-2">
         <h3 className="font-display text-2xl mb-4 flex items-center gap-2">
@@ -401,9 +427,16 @@ function RoomManager() {
         </h3>
         <div className="space-y-3">
           {players.map((p) => (
-            <div key={p.name} className="flex items-center gap-3 bg-secondary/50 rounded-lg p-3 hover:bg-secondary transition">
+            <button
+              key={p.id}
+              onClick={() => {
+                setSelected(p);
+                setSheetOpen(true);
+              }}
+              className="w-full flex items-center gap-3 bg-secondary/50 rounded-lg p-3 hover:bg-secondary transition text-left"
+            >
               <div className="w-11 h-11 rounded-full overflow-hidden border border-primary/40 shrink-0">
-                <img src={AVATAR_IMG} alt="" className="w-full h-full object-cover" />
+                <img src={p.avatar} alt="" className="w-full h-full object-cover" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-display text-lg leading-none">{p.name}</p>
@@ -414,33 +447,55 @@ function RoomManager() {
               <div className="w-28 shrink-0">
                 <div className="flex justify-between text-xs mb-1">
                   <span className="text-muted-foreground">HP</span>
-                  <span>{p.hp}/{p.max}</span>
+                  <span>{p.hp}/{p.maxHp}</span>
                 </div>
                 <div className="h-2 rounded-full bg-background overflow-hidden">
                   <div
                     className="h-full bg-gradient-to-r from-accent to-destructive"
-                    style={{ width: `${(p.hp / p.max) * 100}%` }}
+                    style={{ width: `${(p.hp / p.maxHp) * 100}%` }}
                   />
                 </div>
               </div>
               <Icon name="ChevronRight" size={16} className="text-muted-foreground" />
-            </div>
+            </button>
           ))}
         </div>
       </Panel>
+      <RoomModal open={roomOpen} onOpenChange={setRoomOpen} mode="create" onSuccess={(title, code) => setRoom({ title, code })} />
+      <CharacterSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        character={selected}
+        mode="view"
+        onSave={(updated) => setPlayers((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))}
+      />
     </div>
   );
+}
+
+interface Token {
+  id: number;
+  x: number;
+  y: number;
+  type: 'player' | 'enemy' | 'npc' | 'prop';
+  label: string;
+  hp: number;
+  color: string;
+  avatar?: string;
 }
 
 /* ---------- BATTLE MAP ---------- */
 function BattleMap() {
   const [rolling, setRolling] = useState<null | { name: string; value: number; shape: DieShape }>(null);
-  const [tokens, setTokens] = useState([
-    { id: 1, x: 25, y: 35, type: 'player', label: 'Лираэль', hp: 86, color: '#4ade80' },
+  const [mapImg, setMapImg] = useState(MAP_POOL[0]);
+  const [generatingMap, setGeneratingMap] = useState(false);
+  const [tokens, setTokens] = useState<Token[]>([
+    { id: 1, x: 25, y: 35, type: 'player', label: 'Лираэль', hp: 86, color: '#4ade80', avatar: AVATAR_POOL[0] },
     { id: 2, x: 55, y: 55, type: 'enemy', label: 'Гоблин', hp: 40, color: '#ef4444' },
     { id: 3, x: 70, y: 30, type: 'npc', label: 'Торговец', hp: 100, color: '#60a5fa' },
-    { id: 4, x: 42, y: 70, type: 'prop', label: 'Сундук', hp: 100, color: '#d99a3a' },
   ]);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const dragId = useRef<number | null>(null);
 
   const roll = (name: string, sides: number, shape: DieShape) => {
     const value = Math.floor(Math.random() * sides) + 1;
@@ -448,28 +503,108 @@ function BattleMap() {
     setTimeout(() => setRolling(null), 2200);
   };
 
-  const tokenIcon = (t: string) =>
+  const tokenIcon = (t: Token['type']) =>
     t === 'player' ? 'User' : t === 'enemy' ? 'Skull' : t === 'npc' ? 'MessageCircle' : 'Box';
+
+  const generateMap = () => {
+    setGeneratingMap(true);
+    setTimeout(() => {
+      const options = MAP_POOL.filter((m) => m !== mapImg);
+      setMapImg(options[Math.floor(Math.random() * options.length)] ?? MAP_POOL[0]);
+      setGeneratingMap(false);
+      toast({ title: 'Карта сгенерирована нейросетью' });
+    }, 1200);
+  };
+
+  const addToken = (type: Token['type']) => {
+    const presets: Record<Token['type'], { color: string; label: string }> = {
+      player: { color: '#4ade80', label: 'Игрок' },
+      enemy: { color: '#ef4444', label: 'Враг' },
+      npc: { color: '#60a5fa', label: 'NPC' },
+      prop: { color: '#d99a3a', label: 'Мебель' },
+    };
+    const p = presets[type];
+    setTokens((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        x: 30 + Math.random() * 40,
+        y: 30 + Math.random() * 40,
+        type,
+        label: p.label,
+        hp: 100,
+        color: p.color,
+        avatar: type === 'player' ? AVATAR_POOL[Math.floor(Math.random() * AVATAR_POOL.length)] : undefined,
+      },
+    ]);
+  };
+
+  const removeToken = (id: number) => setTokens((prev) => prev.filter((t) => t.id !== id));
+
+  const onPointerDown = (id: number) => (e: React.PointerEvent) => {
+    e.preventDefault();
+    dragId.current = id;
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (dragId.current === null || !mapRef.current) return;
+    const rect = mapRef.current.getBoundingClientRect();
+    const x = Math.min(96, Math.max(4, ((e.clientX - rect.left) / rect.width) * 100));
+    const y = Math.min(96, Math.max(4, ((e.clientY - rect.top) / rect.height) * 100));
+    setTokens((prev) => prev.map((t) => (t.id === dragId.current ? { ...t, x, y } : t)));
+  };
+
+  const stopDrag = () => {
+    dragId.current = null;
+  };
 
   return (
     <div className="grid lg:grid-cols-4 gap-5">
       {/* Map */}
       <div className="lg:col-span-3">
         <Panel className="p-2 relative overflow-hidden">
-          <div className="relative rounded-md overflow-hidden aspect-[16/10]">
-            <img src={MAP_IMG} alt="карта боя" className="absolute inset-0 w-full h-full object-cover" />
+          <div
+            ref={mapRef}
+            className="relative rounded-md overflow-hidden aspect-[16/10] select-none"
+            onPointerMove={onPointerMove}
+            onPointerUp={stopDrag}
+            onPointerLeave={stopDrag}
+          >
+            <img src={mapImg} alt="карта боя" className="absolute inset-0 w-full h-full object-cover" />
             <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.05)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.05)_1px,transparent_1px)] bg-[size:8%_12.5%]" />
+
+            {generatingMap && (
+              <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center gap-2 z-20">
+                <Icon name="Loader2" size={32} className="text-primary animate-spin" />
+                <span className="text-primary font-display text-lg">Нейросеть рисует карту...</span>
+              </div>
+            )}
+
             {tokens.map((t) => (
               <div
                 key={t.id}
-                className="absolute -translate-x-1/2 -translate-y-1/2 animate-float-token cursor-grab"
+                onPointerDown={onPointerDown(t.id)}
+                className="absolute -translate-x-1/2 -translate-y-1/2 group touch-none cursor-grab active:cursor-grabbing"
                 style={{ left: `${t.x}%`, top: `${t.y}%` }}
               >
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    removeToken(t.id);
+                  }}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-destructive text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition z-10"
+                >
+                  <Icon name="X" size={10} />
+                </button>
                 <div
-                  className="w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center border-2 shadow-lg"
+                  className="w-9 h-9 md:w-11 md:h-11 rounded-full flex items-center justify-center border-2 shadow-lg overflow-hidden animate-float-token"
                   style={{ borderColor: t.color, background: `${t.color}22`, boxShadow: `0 0 12px ${t.color}88` }}
                 >
-                  <Icon name={tokenIcon(t.type)} size={16} style={{ color: t.color }} />
+                  {t.avatar ? (
+                    <img src={t.avatar} alt="" className="w-full h-full object-cover pointer-events-none" draggable={false} />
+                  ) : (
+                    <Icon name={tokenIcon(t.type)} size={16} style={{ color: t.color }} />
+                  )}
                 </div>
                 <div className="mt-1 w-full h-1 rounded-full bg-black/50 overflow-hidden">
                   <div className="h-full" style={{ width: `${t.hp}%`, background: t.color }} />
@@ -480,7 +615,7 @@ function BattleMap() {
 
             {/* flying dice */}
             {rolling && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30">
                 <div className="animate-dice flex flex-col items-center">
                   <DiceShape shape={rolling.shape} className="w-28 h-28 glow-gold">
                     <span className="font-rune text-5xl gold-text">{rolling.value}</span>
@@ -526,14 +661,25 @@ function BattleMap() {
             <Icon name="Wand2" size={17} className="text-primary" /> ИИ-мастерская
           </h3>
           <div className="space-y-2">
+            <button
+              onClick={generateMap}
+              disabled={generatingMap}
+              className="w-full flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-secondary/60 border border-border hover:border-primary/50 transition text-left disabled:opacity-50"
+            >
+              <Icon name={generatingMap ? 'Loader2' : 'Image'} size={15} className={`text-primary ${generatingMap ? 'animate-spin' : ''}`} />
+              {generatingMap ? 'Рисуем карту...' : 'Сгенерировать карту'}
+            </button>
             {[
-              { i: 'Image', t: 'Сгенерировать карту' },
-              { i: 'Skull', t: 'Создать врага' },
+              { i: 'Skull', t: 'Создать врага', type: 'enemy' as const },
               { i: 'Gem', t: 'Придумать лут' },
-              { i: 'MessageCircle', t: 'Оживить NPC' },
+              { i: 'MessageCircle', t: 'Оживить NPC', type: 'npc' as const },
             ].map((a) => (
               <button
                 key={a.t}
+                onClick={() => {
+                  if (a.type) addToken(a.type);
+                  toast({ title: a.t, description: 'Нейросеть добавила результат на стол' });
+                }}
                 className="w-full flex items-center gap-2 text-sm px-3 py-2 rounded-lg bg-secondary/60 border border-border hover:border-primary/50 transition text-left"
               >
                 <Icon name={a.i} size={15} className="text-primary" /> {a.t}
@@ -545,32 +691,20 @@ function BattleMap() {
           <h3 className="font-display text-lg mb-3 flex items-center gap-2">
             <Icon name="Plus" size={17} className="text-primary" /> Добавить фишку
           </h3>
+          <p className="text-xs text-muted-foreground mb-2">Перетаскивай фишки прямо на карте</p>
           <div className="grid grid-cols-2 gap-2">
             {[
-              { i: 'User', t: 'Игрок', c: '#4ade80' },
-              { i: 'Skull', t: 'Враг', c: '#ef4444' },
-              { i: 'MessageCircle', t: 'NPC', c: '#60a5fa' },
-              { i: 'Box', t: 'Мебель', c: '#d99a3a' },
+              { i: 'User', t: 'Игрок', type: 'player' as const },
+              { i: 'Skull', t: 'Враг', type: 'enemy' as const },
+              { i: 'MessageCircle', t: 'NPC', type: 'npc' as const },
+              { i: 'Box', t: 'Мебель', type: 'prop' as const },
             ].map((a) => (
               <button
                 key={a.t}
-                onClick={() =>
-                  setTokens((prev) => [
-                    ...prev,
-                    {
-                      id: Date.now(),
-                      x: 30 + Math.random() * 40,
-                      y: 30 + Math.random() * 40,
-                      type: a.t === 'Игрок' ? 'player' : a.t === 'Враг' ? 'enemy' : a.t === 'NPC' ? 'npc' : 'prop',
-                      label: a.t,
-                      hp: 100,
-                      color: a.c,
-                    },
-                  ])
-                }
+                onClick={() => addToken(a.type)}
                 className="flex flex-col items-center gap-1 py-2 rounded-lg bg-secondary/60 border border-border hover:border-primary/50 transition"
               >
-                <Icon name={a.i} size={17} style={{ color: a.c }} />
+                <Icon name={a.i} size={17} className="text-primary" />
                 <span className="text-xs">{a.t}</span>
               </button>
             ))}
@@ -583,16 +717,42 @@ function BattleMap() {
 
 /* ---------- PLAYER PANEL ---------- */
 function PlayerPanel() {
-  const chars = [
-    { name: 'Лираэль', race: 'Лесной эльф', cls: 'Следопыт', lvl: 4, hp: 28 },
-    { name: 'Каэль', race: 'Человек', cls: 'Паладин', lvl: 6, hp: 52 },
-  ];
+  const [chars, setChars] = useState<Character[]>([
+    { id: 1, name: 'Лираэль', race: 'Эльф', cls: 'Следопыт', lvl: 4, hp: 28, maxHp: 28, avatar: AVATAR_POOL[0], backstory: 'Хранительница леса Тень-Шёпот, ищущая пропавшего брата.', stats: randomStats() },
+    { id: 2, name: 'Каэль', race: 'Человек', cls: 'Паладин', lvl: 6, hp: 52, maxHp: 52, avatar: AVATAR_POOL[2], backstory: 'Странствующий рыцарь, поклявшийся защищать слабых.', stats: randomStats() },
+  ]);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetMode, setSheetMode] = useState<'create' | 'edit' | 'view'>('view');
+  const [selected, setSelected] = useState<Character | null>(null);
+  const [joinOpen, setJoinOpen] = useState(false);
+
   const spells = [
     { name: 'Огненный шар', lvl: 3, icon: 'Flame', color: '#ef4444' },
     { name: 'Лечение ран', lvl: 1, icon: 'Heart', color: '#4ade80' },
     { name: 'Щит веры', lvl: 1, icon: 'Shield', color: '#60a5fa' },
     { name: 'Молния', lvl: 3, icon: 'Zap', color: '#facc15' },
   ];
+  const [activeSpell, setActiveSpell] = useState<string | null>(null);
+
+  const openCreate = () => {
+    setSelected(null);
+    setSheetMode('create');
+    setSheetOpen(true);
+  };
+
+  const openEdit = (c: Character) => {
+    setSelected(c);
+    setSheetMode('edit');
+    setSheetOpen(true);
+  };
+
+  const handleSave = (c: Character) => {
+    setChars((prev) => {
+      const exists = prev.some((p) => p.id === c.id);
+      return exists ? prev.map((p) => (p.id === c.id ? c : p)) : [...prev, c];
+    });
+  };
+
   return (
     <section className="max-w-6xl mx-auto px-4 md:px-6 pt-8 pb-16 animate-fade-in">
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
@@ -600,17 +760,17 @@ function PlayerPanel() {
           <Icon name="Shield" size={22} className="text-primary" />
           <h2 className="font-display text-3xl">Библиотека героев</h2>
         </div>
-        <Button className="gap-2 glow-gold">
+        <Button className="gap-2 glow-gold" onClick={() => setJoinOpen(true)}>
           <Icon name="Swords" size={16} /> Подключиться к игре
         </Button>
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5">
         {chars.map((c) => (
-          <Panel key={c.name} className="hover-scale">
+          <Panel key={c.id} className="hover-scale">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-primary/50 glow-gold">
-                <img src={AVATAR_IMG} alt="" className="w-full h-full object-cover" />
+                <img src={c.avatar} alt="" className="w-full h-full object-cover" />
               </div>
               <div>
                 <p className="font-display text-2xl leading-none">{c.name}</p>
@@ -620,9 +780,9 @@ function PlayerPanel() {
             </div>
             <div className="grid grid-cols-3 gap-2 text-center text-sm">
               {[
-                { l: 'Сила', v: 14 },
-                { l: 'Ловк', v: 18 },
-                { l: 'Тело', v: 13 },
+                { l: 'СИЛ', v: c.stats.str },
+                { l: 'ЛОВ', v: c.stats.dex },
+                { l: 'ТЕЛ', v: c.stats.con },
               ].map((s) => (
                 <div key={s.l} className="bg-secondary/60 rounded-lg py-2 border border-border">
                   <p className="text-xs text-muted-foreground">{s.l}</p>
@@ -630,26 +790,42 @@ function PlayerPanel() {
                 </div>
               ))}
             </div>
-            <Button variant="outline" className="w-full mt-4 gap-2">
-              <Icon name="Pencil" size={14} /> Редактировать
-            </Button>
+            <div className="flex gap-2 mt-4">
+              <Button variant="outline" className="flex-1 gap-2" onClick={() => { setSelected(c); setSheetMode('view'); setSheetOpen(true); }}>
+                <Icon name="Eye" size={14} /> Открыть
+              </Button>
+              <Button variant="outline" className="flex-1 gap-2" onClick={() => openEdit(c)}>
+                <Icon name="Pencil" size={14} /> Изменить
+              </Button>
+            </div>
           </Panel>
         ))}
 
         {/* Create new with AI */}
-        <Panel className="border-dashed flex flex-col items-center justify-center text-center py-8 hover-scale">
-          <div className="w-16 h-16 rounded-full gold-border flex items-center justify-center mb-3">
-            <Icon name="Wand2" size={24} className="text-primary" />
-          </div>
-          <h3 className="font-display text-2xl mb-1">Создать героя</h3>
-          <p className="text-sm text-muted-foreground mb-4 max-w-[220px]">
-            Нейросеть придумает историю, характеристики и нарисует аватарку
-          </p>
-          <Button className="gap-2">
-            <Icon name="Plus" size={16} /> Новый персонаж
-          </Button>
-        </Panel>
+        <button onClick={openCreate} className="text-left">
+          <Panel className="border-dashed flex flex-col items-center justify-center text-center py-8 hover-scale h-full">
+            <div className="w-16 h-16 rounded-full gold-border flex items-center justify-center mb-3">
+              <Icon name="Wand2" size={24} className="text-primary" />
+            </div>
+            <h3 className="font-display text-2xl mb-1">Создать героя</h3>
+            <p className="text-sm text-muted-foreground mb-4 max-w-[220px]">
+              Нейросеть придумает историю, характеристики и нарисует аватарку
+            </p>
+            <span className="inline-flex items-center gap-2 text-sm px-4 py-2 rounded-md bg-primary text-primary-foreground">
+              <Icon name="Plus" size={16} /> Новый персонаж
+            </span>
+          </Panel>
+        </button>
       </div>
+
+      <CharacterSheet
+        open={sheetOpen}
+        onOpenChange={setSheetOpen}
+        character={selected}
+        mode={sheetMode}
+        onSave={handleSave}
+      />
+      <RoomModal open={joinOpen} onOpenChange={setJoinOpen} mode="join" onSuccess={() => {}} />
 
       <Divider />
 
@@ -662,7 +838,14 @@ function PlayerPanel() {
           {spells.map((s) => (
             <button
               key={s.name}
-              className="flex items-center gap-3 px-4 py-3 rounded-lg bg-secondary/60 border border-border hover:border-primary hover:glow-gold transition hover-scale"
+              onClick={() => {
+                setActiveSpell(s.name);
+                toast({ title: `Применено: ${s.name}`, description: 'Эффект отобразится вокруг фишки на боевой карте' });
+                setTimeout(() => setActiveSpell(null), 1500);
+              }}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg bg-secondary/60 border transition hover-scale ${
+                activeSpell === s.name ? 'border-primary glow-gold' : 'border-border hover:border-primary'
+              }`}
             >
               <div
                 className="w-10 h-10 rounded-full flex items-center justify-center border"
